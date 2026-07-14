@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>무임승차 상호작용 시뮬레이터</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#f6f7fb; --card:#fff; --text:#182033; --sub:#667085; --line:#c9d0dc; --accent:#315fca; --accent-bg:#e8efff; --danger:#b23a48; }
+    @media (prefers-color-scheme: dark) { :root { --bg:#151922; --card:#202633; --text:#edf1fa; --sub:#aeb8ca; --line:#485366; --accent:#9db9ff; --accent-bg:#263c70; --danger:#ff9aa6; } }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif; }
+    main { max-width:1080px; margin:0 auto; padding:28px 18px 48px; }
+    h1 { margin:0 0 8px; font-size:clamp(1.45rem,4vw,2rem); } h2 { margin:0 0 12px; font-size:1.2rem; } p { line-height:1.6; }
+    .lead { margin:0 0 22px; color:var(--sub); } .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px; margin:14px 0; }
+    .settings { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; align-items:end; } label { display:grid; gap:6px; font-weight:650; } input,select,button { font:inherit; } input,select { width:100%; padding:10px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--text); }
+    button { padding:10px 14px; border:1px solid var(--line); background:var(--card); color:var(--text); border-radius:8px; cursor:pointer; font-weight:650; } button:hover { filter:brightness(.96); } button.primary { background:var(--accent); color:white; border-color:var(--accent); } button:disabled { opacity:.5; cursor:not-allowed; }
+    .hidden { display:none !important; } .hint { color:var(--sub); font-size:.9rem; margin:8px 0 0; } .toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:0 0 12px; }
+    .toolbar strong { margin-right:4px; }.selected { outline:3px solid var(--accent); outline-offset:1px; background:var(--accent-bg); }
+    .diagram-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:10px; background:color-mix(in srgb,var(--card) 94%,var(--bg)); } svg { display:block; min-width:620px; width:100%; height:auto; }
+    .edge { stroke:var(--line); stroke-width:1.4; stroke-dasharray:3 8; opacity:.45; pointer-events:none; }.edge.active { stroke:var(--accent); stroke-width:5; stroke-dasharray:none; opacity:1; }.edge-hit { stroke:transparent; stroke-width:28; cursor:pointer; }.node { fill:var(--card); stroke:var(--sub); stroke-width:2; cursor:pointer; }.node.assigned { fill:var(--accent-bg); stroke:var(--accent); stroke-width:4; }.node:focus { outline:none; }.node-label { fill:var(--text); font-size:15px; pointer-events:none; text-anchor:middle; dominant-baseline:middle; font-weight:700; }.axis-label { fill:var(--sub); font-size:13px; font-weight:650; }
+    .assignment { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin-top:14px; }.assignment button { text-align:left; min-height:62px; }.assignment span { display:block; color:var(--sub); font-size:.82rem; font-weight:400; margin-top:3px; }
+    .strategy-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(205px,1fr)); gap:12px; }.strategy-grid > div { border:1px solid var(--line); border-radius:10px; padding:12px; }.strategy-grid label { font-size:.95rem; }.summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }.summary div { padding:12px; border-radius:10px; background:var(--accent-bg); }.summary b { display:block; font-size:1.35rem; }.summary span { color:var(--sub); font-size:.85rem; }
+    table { width:100%; border-collapse:collapse; margin-top:12px; } th,td { text-align:center; padding:10px 7px; border-bottom:1px solid var(--line); } th { color:var(--sub); font-size:.88rem; } td:first-child,th:first-child { text-align:left; } .rank { font-weight:800; color:var(--accent); } .note { color:var(--sub); margin-bottom:0; }
+    @media(max-width:560px) { main { padding:18px 12px 35px; }.settings,.summary { grid-template-columns:1fr; }.card { padding:15px; } th,td { padding:8px 4px; font-size:.86rem; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>무임승차 상호작용 시뮬레이터</h1>
+  <p class="lead">플레이어와 단계를 정하고, 협업 도식과 무임승차 전략을 설정한 뒤 결과를 확인하세요.</p>
+
+  <section id="start" class="card">
+    <h2>1. 기본 설정</h2>
+    <div class="settings">
+      <label>플레이어 수 <input id="playerCount" type="number" min="2" max="10" value="3"></label>
+      <label>단계 수 <input id="stageCount" type="number" min="1" max="8" value="2"></label>
+    </div>
+    <p class="hint">각 단계에서 한 노드에 배정된 플레이어들이 하나의 협업 그룹이 됩니다.</p>
+    <p><button id="makeDiagram" class="primary">도식 만들기</button></p>
+  </section>
+
+  <section id="setup" class="hidden">
+    <section class="card">
+      <h2>2. 협업 도식과 플레이어 배정</h2>
+      <div class="toolbar"><strong>간선:</strong><span>같은 행의 점선을 클릭해 굵은 실선으로 만드세요. 굵은 선으로 이어진 노드들이 하나의 분업 그룹이 됩니다.</span></div>
+      <div class="toolbar"><strong id="mappingStatus">대응 설정</strong></div>
+      <div class="diagram-wrap"><svg id="diagram" viewBox="0 0 760 360" role="img" aria-label="단계별 협업 도식"></svg></div>
+      <div id="assignmentInfo" class="assignment"></div>
+      <p class="hint">1단계의 플레이어 1부터 순서대로, 대응할 노드를 클릭하세요. 한 행의 모든 플레이어를 대응시키면 다음 행으로 자동 이동합니다. 각 행에서 굵은 선으로 연결된 노드의 묶음이 그 단계의 분업 단위로 시뮬레이션에 반영됩니다.</p>
+    </section>
+
+    <section class="card">
+      <h2>3. 그룹별 상호작용 선택</h2>
+      <p class="hint">한 그룹에서 여러 상호작용을 함께 선택할 수 있습니다. 굵은 선을 추가하거나 해제하면 아래 그룹도 자동으로 갱신됩니다.</p>
+      <div id="interactionGrid" class="strategy-grid"></div>
+    </section>
+
+    <section class="card">
+      <h2>4. 무임승차자와 전략</h2>
+      <p class="hint">무임승차자는 선택하지 않아도 됩니다. 선택한 플레이어만 전략을 정합니다.</p>
+      <div id="strategyGrid" class="strategy-grid"></div>
+    </section>
+
+    <section class="card">
+      <button id="run" class="primary">시뮬레이션 실행</button>
+      <span id="validation" class="hint" aria-live="polite"></span>
+    </section>
+  </section>
+
+  <section id="result" class="card hidden" aria-live="polite">
+    <h2>결과 순위표</h2>
+    <div class="summary"><div><b id="rounds">0</b><span>진행 라운드</span></div><div><b id="groups">0</b><span>협업 그룹</span></div><div><b id="freeRiders">0</b><span>무임승차자</span></div></div>
+    <p class="hint">종합 순위는 작업량 Z, 신뢰도 T, 정보량 I의 순위 합이 낮은 순서입니다. 동점은 같은 순위로 표시됩니다.</p>
+    <div style="overflow-x:auto"><table><thead><tr><th>종합</th><th>플레이어</th><th>전략</th><th>작업량 Z</th><th>신뢰도 T</th><th>정보량 I</th><th>Z 순위</th><th>T 순위</th><th>I 순위</th></tr></thead><tbody id="ranking"></tbody></table></div>
+  </section>
+</main>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  let n = 3, levels = 2, selectedPlayer = 0, selectedRow = 0, assignments = [], activeEdges = new Set(), interactionSettings = {};
+  const names = i => `플레이어 ${i + 1}`;
+  const point = (row, col) => ({ x: 160 + col * (540 / Math.max(1, n - 1)), y: 80 + row * (220 / Math.max(1, levels - 1)) });
+  const edgeKey = (a, b) => [a, b].sort().join('|');
+  const nodeKey = (r, c) => `${r}:${c}`;
+
+  function rebuild() {
+    n = Number($('playerCount').value); levels = Number($('stageCount').value);
+    if (!Number.isInteger(n) || !Number.isInteger(levels) || n < 2 || n > 10 || levels < 1 || levels > 8) { alert('플레이어는 2~10명, 단계는 1~8개로 입력하세요.'); return; }
+    selectedPlayer = 0; selectedRow = 0; activeEdges = new Set(); interactionSettings = {}; assignments = Array.from({length: levels}, () => Array(n).fill(null));
+    $('setup').classList.remove('hidden'); $('result').classList.add('hidden'); renderAll();
+  }
+  function renderAll() { renderMappingStatus(); renderDiagram(); renderAssignments(); renderInteractions(); renderStrategies(); }
+  function renderMappingStatus() {
+    $('mappingStatus').textContent = selectedRow < levels ? `현재 대응: ${selectedRow + 1}단계 · ${names(selectedPlayer)}` : '모든 플레이어 대응 완료';
+  }
+  function advanceMapping() {
+    if (++selectedPlayer === n) { selectedPlayer = 0; selectedRow++; }
+    renderMappingStatus();
+  }
+  function possibleEdges() {
+    const list=[];
+    for (let r=0;r<levels;r++) for (let c=0;c<n;c++) {
+      if (c<n-1) list.push([nodeKey(r,c), nodeKey(r,c+1)]);
+    } return list;
+  }
+  function groupsForRow(row) {
+    const parent=Array.from({length:n},(_,i)=>i);
+    const find=x=>parent[x]===x?x:(parent[x]=find(parent[x]));
+    const join=(a,b)=>{a=find(a);b=find(b);if(a!==b)parent[b]=a;};
+    for(let c=0;c<n-1;c++) if(activeEdges.has(edgeKey(nodeKey(row,c),nodeKey(row,c+1)))) join(c,c+1);
+    const groups=new Map();
+    for(let node=0;node<n;node++){const root=find(node);if(!groups.has(root))groups.set(root,[]);groups.get(root).push(node);}
+    return [...groups.values()];
+  }
+  function simulationGroups() {
+    return assignments.flatMap((row,r)=>groupsForRow(r).map(nodes=>row.map((node,p)=>nodes.includes(node)?p:null).filter(p=>p!==null)).filter(group=>group.length));
+  }
+  function interactionKey(row, nodes) { return `${row}:${nodes.join('-')}`; }
+  function settingFor(row, nodes) {
+    const key=interactionKey(row,nodes);
+    if (!interactionSettings[key]) interactionSettings[key]={share:false,feedback:false,help:false};
+    return interactionSettings[key];
+  }
+  function renderDiagram() {
+    const svg=$('diagram'); svg.innerHTML=''; const ns='http://www.w3.org/2000/svg';
+    for(let r=0;r<levels;r++) { const label=document.createElementNS(ns,'text'); label.setAttribute('x','22'); label.setAttribute('y',String(point(r,0).y+5)); label.setAttribute('class','axis-label'); label.textContent=`${r+1}단계`; svg.append(label); }
+    for (const [a,b] of possibleEdges()) { const [ar,ac]=a.split(':').map(Number), [br,bc]=b.split(':').map(Number), A=point(ar,ac),B=point(br,bc), key=edgeKey(a,b); const toggle=()=>{ activeEdges.has(key)?activeEdges.delete(key):activeEdges.add(key);renderDiagram();renderAssignments();renderInteractions();}; const hit=document.createElementNS(ns,'line'); hit.setAttribute('x1',A.x);hit.setAttribute('y1',A.y);hit.setAttribute('x2',B.x);hit.setAttribute('y2',B.y);hit.setAttribute('class','edge-hit');hit.setAttribute('role','button');hit.setAttribute('tabindex','0');hit.setAttribute('aria-label',`${ar+1}단계 ${ac+1}번과 ${bc+1}번 노드 간선 선택`);hit.onclick=toggle;hit.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}};svg.append(hit); const line=document.createElementNS(ns,'line'); line.setAttribute('x1',A.x);line.setAttribute('y1',A.y);line.setAttribute('x2',B.x);line.setAttribute('y2',B.y);line.setAttribute('class','edge'+(activeEdges.has(key)?' active':'')); svg.append(line); }
+    for(let r=0;r<levels;r++) for(let c=0;c<n;c++) { const P=point(r,c), circle=document.createElementNS(ns,'circle'); circle.setAttribute('cx',P.x);circle.setAttribute('cy',P.y);circle.setAttribute('r','24'); circle.setAttribute('class','node'+(assignments[r].includes(c)?' assigned':'')); circle.setAttribute('tabindex','0'); circle.setAttribute('role','button'); circle.setAttribute('aria-label',`${r+1}단계 ${c+1}번 노드`); const choose=()=>{ if(selectedRow >= levels || r !== selectedRow) return; assignments[r][selectedPlayer]=c; advanceMapping(); renderDiagram();renderAssignments();renderInteractions();};circle.onclick=choose;circle.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();choose();}};svg.append(circle); const text=document.createElementNS(ns,'text'); text.setAttribute('x',P.x);text.setAttribute('y',P.y+1);text.setAttribute('class','node-label');text.textContent='O';svg.append(text); }
+  }
+  function renderAssignments() {
+    const box=$('assignmentInfo');box.innerHTML=''; for(let r=0;r<levels;r++){const entries=groupsForRow(r).map(nodes=>{const players=assignments[r].map((node,p)=>nodes.includes(node)?p+1:null).filter(p=>p!==null);return players.length?`노드 ${nodes.map(x=>x+1).join('–')}: ${players.map(x=>'P'+x).join(', ')}`:null;}).filter(Boolean);const item=document.createElement('button');item.disabled=true;item.innerHTML=`${r+1}단계<span>${entries.length?entries.join(' · '):'플레이어 대응 대기 중'}</span>`;box.append(item);}
+  }
+  function renderInteractions() {
+    const box=$('interactionGrid'); box.innerHTML=''; let count=0;
+    for(let r=0;r<levels;r++) for(const nodes of groupsForRow(r)) {
+      const players=assignments[r].map((node,p)=>nodes.includes(node)?p+1:null).filter(p=>p!==null);
+      if(!players.length || nodes.length < 2) continue;
+      const setting=settingFor(r,nodes), key=interactionKey(r,nodes), d=document.createElement('div');
+      d.innerHTML=`<strong>${r+1}단계 · 노드 ${nodes.map(x=>x+1).join('–')}</strong><p class="hint">${players.map(x=>'P'+x).join(', ')}</p><label><input type="checkbox" data-kind="share" ${setting.share?'checked':''}> 정보 공유</label><label><input type="checkbox" data-kind="feedback" ${setting.feedback?'checked':''}> 피드백</label><label><input type="checkbox" data-kind="help" ${setting.help?'checked':''}> 도움</label>`;
+      d.querySelectorAll('input').forEach(input=>input.onchange=()=>{ setting[input.dataset.kind]=input.checked; interactionSettings[key]=setting; }); box.append(d); count++;
+    }
+    if(!count) box.innerHTML='<p class="hint">굵은 선으로 두 개 이상의 노드를 연결하면, 여기에서 해당 그룹의 상호작용을 선택할 수 있습니다.</p>';
+  }
+  function renderStrategies() {
+    const box=$('strategyGrid');box.innerHTML=''; for(let p=0;p<n;p++){const d=document.createElement('div');d.innerHTML=`<label><input type="checkbox" id="free-${p}"> ${names(p)}을(를) 무임승차자로 설정</label><label>전략<select id="strategy-${p}" disabled><option value="A">어부지리</option><option value="N">안하기</option><option value="C">치트키</option></select></label>`;box.append(d);const check=$(`free-${p}`),select=$(`strategy-${p}`);check.onchange=()=>select.disabled=!check.checked;}
+  }
+  function exp(mean) { return mean<=0 ? 0 : -Math.log(1-Math.random())*mean; }
+  function rank(values) { const sorted=[...values].sort((a,b)=>b-a); return values.map(v=>sorted.indexOf(v)+1); }
+  function strategyLabel(s) { return ({P:'일반 참여',A:'어부지리',N:'안하기',C:'치트키'})[s]; }
+  function runSimulation() {
+    if (selectedRow < levels) { $('validation').textContent = '모든 단계에서 플레이어 대응을 완료한 뒤 실행하세요.'; return; }
+    $('validation').textContent = '';
+    const state=Array.from({length:n},(_,i)=>({ name:names(i), strategy: $('free-'+i).checked ? $('strategy-'+i).value : 'P', Z:0, T:0, I:0, A:0, E:1, arms:Array.from({length:5},()=>({z:0,l:0,count:0})) }));
+    const rounds=levels*10;
+    // 굵은 간선으로 연결된 같은 행의 노드를 하나의 분업 그룹으로 구성
+    const stageGroups=[];
+    for(let row=0;row<levels;row++) for(const nodes of groupsForRow(row)) { const players=assignments[row].map((node,p)=>nodes.includes(node)?p:null).filter(p=>p!==null); if(players.length) stageGroups.push({players, setting:settingFor(row,nodes)}); }
+    for(let round=0;round<rounds;round++) for(const {players:group,setting} of stageGroups) {
+      const totalT=group.reduce((s,i)=>s+state[i].T,0)+group.length;
+      const realT=Object.fromEntries(group.map(i=>[i,(state[i].T+1)/totalT]));
+      const produced=[];
+      for(const i of group) { const p=state[i]; if(p.strategy==='N') { produced.push({i,items:[]}); continue; }
+        let arm=0; if(p.strategy==='A') arm=p.arms.reduce((best,a,j)=>a.z>p.arms[best].z?j:best,0); else if(p.strategy==='C') arm=p.arms.reduce((best,a,j)=>(a.l&&a.z/a.l)>(p.arms[best].l?p.arms[best].z/p.arms[best].l:-1)?j:best,0); else { const untried=p.arms.findIndex(a=>!a.count); arm=untried>=0?untried:p.arms.reduce((best,a,j)=>a.z*a.l+Math.sqrt(2/a.count)>p.arms[best].z*p.arms[best].l+Math.sqrt(2/p.arms[best].count)?j:best,0); }
+        const items=Array.from({length:Math.max(1,Math.round(exp(1)))},()=>({z:exp(5)*p.E,l:exp(5)})); const z=items.reduce((s,x)=>s+x.z,0),l=items.reduce((s,x)=>s+x.l,0); const a=p.arms[arm]; a.z=(a.z*a.count+z)/(a.count+1);a.l=(a.l*a.count+l)/(a.count+1);a.count++;p.Z+=z;p.I+=items.length;produced.push({i,items}); }
+      for(const source of produced) for(const target of group) if(source.i!==target && source.items.length) { if(setting.share){const amount=Math.min(source.items.length,Math.max(0,Math.round(0.1*realT[target]*source.items.length))); if(amount){state[target].Z+=source.items.slice(0,amount).reduce((s,x)=>s+x.z,0);state[target].I+=amount;state[source.i].T+=0.01*amount;}} if(setting.feedback) state[target].A+=100*realT[source.i]; if(setting.help) state[target].E+=source.items.length; }
+    }
+    const zr=rank(state.map(p=>p.Z)), tr=rank(state.map(p=>p.T)), ir=rank(state.map(p=>p.I)); const enriched=state.map((p,i)=>({...p,zr:zr[i],tr:tr[i],ir:ir[i],score:zr[i]+tr[i]+ir[i]})).sort((a,b)=>a.score-b.score||b.Z-a.Z);
+    $('rounds').textContent=rounds; $('groups').textContent=stageGroups.length; $('freeRiders').textContent=state.filter(p=>p.strategy!=='P').length;
+    $('ranking').innerHTML=enriched.map((p,i)=>`<tr><td class="rank">${i+1}위</td><td>${p.name}</td><td>${strategyLabel(p.strategy)}</td><td>${p.Z.toFixed(2)}</td><td>${p.T.toFixed(2)}</td><td>${p.I}</td><td>${p.zr}위</td><td>${p.tr}위</td><td>${p.ir}위</td></tr>`).join(''); $('result').classList.remove('hidden'); $('result').scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  $('makeDiagram').onclick=rebuild; $('run').onclick=runSimulation;
+})();
+</script>
+</body>
+</html>
